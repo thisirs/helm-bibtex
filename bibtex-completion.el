@@ -697,10 +697,15 @@ Fields from crossreferenced entries are appended to the requested entry."
     bibtex-completion-find-pdf-zotero))
 
 (defun bibtex-completion-find-pdf-simple (value)
-  (if (f-file? value)
-      (list value)
-    (-filter 'f-file? (--map (f-join it (f-filename value))
-                             (-flatten bibtex-completion-library-path)))))
+  "Handle semicolon-separated relative or absolute filenames."
+  (let* ((value (replace-regexp-in-string "\\([^\\]\\);" "\\1\^^" value))
+         (items (s-split "\^^" value))
+         (paths (-separate 'f-absolute-p items)))
+    (append
+     (--filter (and (f-file? it) (s-ends-with? ".pdf" it :ignore-case)) (car paths))
+     (--filter (and (f-file? it) (s-ends-with? ".pdf" it :ignore-case))
+               (-table-flat 'f-join (-flatten bibtex-completion-library-path)
+                            (cdr paths))))))
 
 (defun bibtex-completion-find-pdf-zotero (value)
   (let* ((value (replace-regexp-in-string "\\([^\\]\\);" "\\1\^^" value))
