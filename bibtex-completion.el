@@ -711,7 +711,8 @@ Fields from crossreferenced entries are appended to the requested entry."
   (let* ((value (replace-regexp-in-string "\\([^\\]\\);" "\\1\^^" value))
          (items (s-split "\^^" value)))
     (when (zerop (% (length items) 3))
-      (-map #'cadr (-partition 3 items)))))
+      (--filter (and (f-file? it) (s-ends-with? ".pdf" it :ignore-case))
+                (-map #'cadr (-partition 3 items))))))
 
 (defun bibtex-completion-find-pdf-in-field (key-or-entry)
   "Return the path of the PDF specified in the field `bibtex-completion-pdf-field' if that file exists.
