@@ -692,6 +692,22 @@ Fields from crossreferenced entries are appended to the requested entry."
           (display-warning :warning (concat "Bibtex-completion couldn't find entry with key \"" entry-key "\"."))
           nil)))))
 
+(defvar bibtex-completion-find-pdf-hook
+  '(bibtex-completion-find-pdf-simple
+    bibtex-completion-find-pdf-zotero))
+
+(defun bibtex-completion-find-pdf-simple (value)
+  (if (f-file? value)
+      (list value)
+    (-filter 'f-file? (--map (f-join it (f-filename value))
+                             (-flatten bibtex-completion-library-path)))))
+
+(defun bibtex-completion-find-pdf-zotero (value)
+  (let* ((value (replace-regexp-in-string "\\([^\\]\\);" "\\1\^^" value))
+         (items (s-split "\^^" value)))
+    (when (zerop (% (length items) 3))
+      (-map #'cadr (-partition 3 items)))))
+
 (defun bibtex-completion-find-pdf-in-field (key-or-entry)
   "Return the path of the PDF specified in the field `bibtex-completion-pdf-field' if that file exists.
 Returns nil if no file is specified, or if the specified file
@@ -701,41 +717,8 @@ does not exist, or if `bibtex-completion-pdf-field' is nil."
                       (bibtex-completion-get-entry1 key-or-entry t)
                     key-or-entry))
            (value (bibtex-completion-get-value bibtex-completion-pdf-field entry)))
-      (cond
-       ((not value) nil)         ; Field not defined.
-       ((f-file? value) (list value))   ; A bare full path was found.
-       ((-any 'f-file? (--map (f-join it (f-filename value)) (-flatten bibtex-completion-library-path))) (-filter 'f-file? (--map (f-join it (f-filename value)) (-flatten bibtex-completion-library-path))))
-       (t                               ; Zotero/Mendeley/JabRef/Calibre format:
-        (let ((value (replace-regexp-in-string "\\([^\\]\\)[;,]" "\\1\^^" value)))
-          (cl-loop  ; Looping over the files:
-           for record in (s-split "\^^" value)
-                                        ; Replace unescaped colons by field separator:
-           for record = (replace-regexp-in-string "\\([^\\]\\|^\\):" "\\1\^_" record)
-                                        ; Unescape stuff:
-           for record = (replace-regexp-in-string "\\\\\\(.\\)" "\\1" record)
-                                        ; Now we can safely split:
-           for record = (s-split "\^_" record)
-           for file-name = (nth 0 record)
-           for path = (or (nth 1 record) "")
-           for paths = (if (s-match "^[A-Z]:" path)
-                           (list path)                 ; Absolute Windows path
-                                        ; Something else:
-                         (append
-                          (list
-                           path
-                           file-name
-                           (f-join (f-root) path) ; Mendeley #105
-                           (f-join (f-root) path file-name)) ; Mendeley #105
-                          (--map (f-join it path)
-                                 (-flatten bibtex-completion-library-path)) ; Jabref #100
-                          (--map (f-join it path file-name)
-                                 (-flatten bibtex-completion-library-path)))) ; Jabref #100
-           for result = (-first (lambda (path)
-                                  (if (and (not (s-blank-str? path))
-                                           (f-exists? path))
-                                      path nil)) paths)
-           if result collect result)))))))
-
+      (when value
+        (run-hook-with-args-until-success 'bibtex-completion-find-pdf-hook value)))))
 
 (defun bibtex-completion-find-pdf-in-library (key-or-entry &optional find-additional)
   "Searches the directories in `bibtex-completion-library-path' for a PDF whose name is composed of the BibTeX key plus `bibtex-completion-pdf-extension'.
