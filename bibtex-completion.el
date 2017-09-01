@@ -705,7 +705,7 @@ Fields from crossreferenced entries are appended to the requested entry."
      (--filter (and (f-file? it) (s-ends-with? ".pdf" it :ignore-case)) (car paths))
      (--filter (and (f-file? it) (s-ends-with? ".pdf" it :ignore-case))
                (-table-flat 'f-join (-flatten bibtex-completion-library-path)
-                            (cdr paths))))))
+                            (cadr paths))))))
 
 (defun bibtex-completion-find-pdf-zotero (value)
   (let* ((value (replace-regexp-in-string "\\([^\\]\\);" "\\1\^^" value))
